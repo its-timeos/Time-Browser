@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Browser — A browser built around your time</title>
+<meta name="description" content="Time Browser is a lightweight, keyboard-first desktop browser with a liquid glass interface, local-first bookmarks and history, and zero telemetry. Download v0.0.7 for macOS.">
+<style>
+/* ============================================================
+   TIME BROWSER — MARKETING SITE
+   Liquid Glass design system (shared tokens with docs.html)
+   ============================================================ */
+:root{
+  --canvas:#08090b;
+  --surface-low:#0f1114;
+  --surface-md:#15181d;
+  --surface-high:#1b1f25;
+
+  --glass-bg:rgba(19,21,25,0.60);
+  --glass-bg-elevated:rgba(28,31,37,0.62);
+  --glass-bg-hover:rgba(255,255,255,0.055);
+  --glass-bg-active:rgba(255,255,255,0.09);
+  --glass-border:rgba(255,255,255,0.09);
+  --glass-border-strong:rgba(255,255,255,0.18);
+  --glass-specular: inset 0 1px 1px 0 rgba(255,255,255,0.10), inset 0 -1px 1px 0 rgba(0,0,0,0.4);
+
+  --blur-sm:blur(10px);
+  --blur-md:blur(24px);
+  --blur-lg:blur(46px);
+
+  --text-primary:#eef1f4;
+  --text-secondary:#98a1ac;
+  --text-tertiary:#5c6570;
+  --text-on-accent:#08101f;
+
+  --accent:#4c8bf5;
+  --accent-2:#8b7cf6;
+  --accent-hover:#6ba0f7;
+  --accent-subtle:rgba(76,139,245,0.13);
+  --accent-border:rgba(76,139,245,0.35);
+  --success:#7fd08a;
+
+  --font-sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Inter','Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  --font-mono:'SF Mono','JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,Menlo,Consolas,monospace;
+
+  --radius-sm:8px;
+  --radius-md:14px;
+  --radius-lg:22px;
+  --radius-xl:28px;
+  --radius-pill:999px;
+
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+  --nav-h:68px;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto;}
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}
+}
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse 1100px 620px at 12% -8%, rgba(76,139,245,0.14), transparent 58%),
+    radial-gradient(ellipse 900px 640px at 100% 6%, rgba(139,124,246,0.10), transparent 55%),
+    radial-gradient(ellipse 800px 500px at 50% 100%, rgba(76,139,245,0.06), transparent 60%),
+    var(--canvas);
+  color:var(--text-primary);
+  font-family:var(--font-sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:var(--accent-subtle);color:var(--text-primary);}
+a{color:inherit;text-decoration:none;}
+img,svg{display:block;max-width:100%;}
+button{font-family:inherit;}
+
+a:focus-visible,button:focus-visible,summary:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:3px;
+  border-radius:6px;
+}
+
+.container{max-width:1160px;margin:0 auto;padding:0 28px;}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);
+}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+
+/* ---------- reveal-on-scroll ---------- */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease-out), transform .7s var(--ease-out);}
+.reveal.is-visible{opacity:1;transform:translateY(0);}
+
+/* ---------- Glass primitives ---------- */
+.glass-panel{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-lg);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  box-shadow:var(--glass-specular), 0 20px 60px rgba(0,0,0,0.35);
+}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  padding:13px 22px;border-radius:var(--radius-pill);
+  font-size:14.5px;font-weight:600;
+  border:1px solid transparent;cursor:pointer;
+  transition:transform .18s var(--ease-out), background .18s var(--ease-out), border-color .18s var(--ease-out), box-shadow .18s var(--ease-out);
+  white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1.5px);}
+.btn:active{transform:translateY(0);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;
+  box-shadow:0 10px 30px rgba(76,139,245,0.35);
+}
+.btn-primary:hover{box-shadow:0 14px 38px rgba(76,139,245,0.45);}
+.btn-glass{
+  background:var(--glass-bg-hover);
+  border-color:var(--glass-border);
+  color:var(--text-primary);
+  backdrop-filter:var(--blur-sm);-webkit-backdrop-filter:var(--blur-sm);
+}
+.btn-glass:hover{background:var(--glass-bg-active);border-color:var(--glass-border-strong);}
+.btn-sm{padding:9px 16px;font-size:13px;}
+.btn-block{width:100%;}
+.btn svg{flex-shrink:0;}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:var(--nav-h);
+  display:flex;align-items:center;
+  background:var(--glass-bg);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border-bottom:1px solid var(--glass-border);
+}
+.nav-inner{
+  width:100%;max-width:1160px;margin:0 auto;padding:0 28px;
+  display:flex;align-items:center;gap:28px;
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;letter-spacing:-.01em;margin-right:6px;}
+.brand .brand-mark{
+  width:26px;height:26px;border-radius:8px;
+  background:linear-gradient(160deg,#1b1e24,#0c0d10);
+  border:1px solid var(--glass-border-strong);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.brand .brand-mark::after{
+  content:"";width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #a9c6ff, var(--accent) 60%);
+  box-shadow:0 0 10px 2px rgba(76,139,245,0.75);
+}
+.nav-links{display:flex;align-items:center;gap:6px;}
+.nav-links a{
+  padding:8px 13px;border-radius:var(--radius-pill);
+  font-size:13.5px;color:var(--text-secondary);font-weight:500;
+  transition:background .15s var(--ease-out), color .15s var(--ease-out);
+}
+.nav-links a:hover{background:var(--glass-bg-hover);color:var(--text-primary);}
+.nav-cta{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.nav-version{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--text-tertiary);
+  background:var(--glass-bg-hover);border:1px solid var(--glass-border);
+  padding:5px 10px;border-radius:var(--radius-pill);
+}
+.menu-toggle{
+  display:none;margin-left:auto;
+  width:38px;height:38px;border-radius:var(--radius-sm);
+  background:var(--glass-bg-hover);border:1px solid var(--glass-border);
+  color:var(--text-primary);align-items:center;justify-content:center;cursor:pointer;
+}
+.mobile-panel{
+  display:none;position:fixed;top:var(--nav-h);left:0;right:0;z-index:99;
+  background:var(--glass-bg-elevated);backdrop-filter:var(--blur-lg);-webkit-backdrop-filter:var(--blur-lg);
+  border-bottom:1px solid var(--glass-border);
+  padding:14px 20px 22px;flex-direction:column;gap:2px;
+}
+.mobile-panel.open{display:flex;}
+.mobile-panel a{padding:12px 10px;border-radius:10px;color:var(--text-secondary);font-size:15px;font-weight:500;}
+.mobile-panel a:hover{background:var(--glass-bg-hover);color:var(--text-primary);}
+.mobile-panel .btn{margin-top:10px;}
+
+@media (max-width:920px){
+  .nav-links{display:none;}
+  .nav-version{display:none;}
+  .menu-toggle{display:flex;}
+  .nav-cta .btn-glass{display:none;}
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  padding:calc(var(--nav-h) + 96px) 0 60px;
+  position:relative;
+}
+.hero-grid{
+  display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;
+}
+.hero-copy h1{
+  font-size:clamp(38px,5.4vw,62px);
+  line-height:1.05;letter-spacing:-.025em;font-weight:700;
+  margin:18px 0 20px;
+}
+.hero-copy h1 .grad{
+  background:linear-gradient(120deg,var(--accent),var(--accent-2) 70%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.hero-copy p.lede{
+  font-size:17.5px;line-height:1.65;color:var(--text-secondary);
+  max-width:520px;margin:0 0 30px;
+}
+.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:22px;}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;color:var(--text-tertiary);font-size:13px;}
+.hero-meta span{display:inline-flex;align-items:center;gap:7px;}
+.hero-meta .pip{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);}
+
+/* ---- Floating browser mockup (signature element) ---- */
+.mock-stage{position:relative;perspective:1400px;}
+.mock-window{
+  border-radius:16px;overflow:hidden;
+  background:var(--surface-low);
+  border:1px solid var(--glass-border-strong);
+  box-shadow:0 30px 90px rgba(0,0,0,0.55), 0 6px 24px rgba(76,139,245,0.12), var(--glass-specular);
+  transform:rotateX(4deg) rotateY(-8deg);
+  animation:float 7s ease-in-out infinite;
+  transform-style:preserve-3d;
+}
+@keyframes float{
+  0%,100%{transform:rotateX(4deg) rotateY(-8deg) translateY(0);}
+  50%{transform:rotateX(2deg) rotateY(-6deg) translateY(-14px);}
+}
+.mock-chrome{background:var(--surface-md);border-bottom:1px solid var(--glass-border);}
+.mock-tabbar{display:flex;align-items:center;gap:6px;padding:11px 12px 0;}
+.mock-traffic{display:flex;gap:7px;margin-right:8px;padding-bottom:11px;}
+.mock-traffic i{width:11px;height:11px;border-radius:50%;display:block;}
+.mock-traffic i:nth-child(1){background:#ec6a5e;}
+.mock-traffic i:nth-child(2){background:#f4bf4f;}
+.mock-traffic i:nth-child(3){background:#61c454;}
+.mock-tab{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 14px;border-radius:9px 9px 0 0;
+  font-size:11.5px;color:var(--text-secondary);
+  background:rgba(255,255,255,0.03);
+  max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mock-tab.active{background:var(--surface-low);color:var(--text-primary);}
+.mock-tab .fav{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.mock-tab-plus{color:var(--text-tertiary);padding:8px 10px;font-size:14px;}
+.mock-navbar{display:flex;align-items:center;gap:10px;padding:10px 12px;}
+.mock-nav-icons{display:flex;gap:6px;color:var(--text-tertiary);}
+.mock-nav-icons svg{width:13px;height:13px;}
+.mock-omnibox{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);
+  border-radius:var(--radius-pill);padding:7px 13px;
+  font-size:11.5px;color:var(--text-secondary);font-family:var(--font-mono);
+}
+.mock-omnibox svg{width:11px;height:11px;color:var(--success);flex-shrink:0;}
+.mock-viewport{
+  height:230px;position:relative;
+  background:
+    radial-gradient(ellipse 420px 220px at 20% 0%, rgba(76,139,245,0.14), transparent 60%),
+    radial-gradient(ellipse 320px 220px at 100% 100%, rgba(139,124,246,0.12), transparent 60%),
+    var(--surface-low);
+  padding:20px;
+}
+.mock-line{height:9px;border-radius:5px;background:rgba(255,255,255,0.06);margin-bottom:10px;}
+.mock-card{
+  margin-top:14px;padding:14px;border-radius:12px;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  display:flex;align-items:center;gap:12px;
+}
+.mock-card .sq{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));flex-shrink:0;}
+.mock-statusbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;font-size:10.5px;color:var(--text-tertiary);
+  border-top:1px solid var(--glass-border);font-family:var(--font-mono);
+  background:var(--surface-md);
+}
+.mock-statusbar .clock{color:var(--accent);letter-spacing:.02em;}
+.mock-glow{
+  position:absolute;inset:-60px;z-index:-1;
+  background:radial-gradient(circle at 60% 40%, rgba(76,139,245,0.22), transparent 60%);
+  filter:blur(40px);
+}
+
+@media (max-width:920px){
+  .hero-grid{grid-template-columns:1fr;gap:44px;}
+  .mock-window{transform:none;animation:none;}
+  .hero-copy p.lede{max-width:none;}
+}
+
+/* ============================================================
+   SECTION HEADERS
+   ============================================================ */
+.section{padding:100px 0;}
+.section-head{max-width:620px;margin-bottom:52px;}
+.section-head h2{
+  font-size:clamp(28px,3.6vw,38px);letter-spacing:-.02em;font-weight:700;
+  margin:14px 0 12px;
+}
+.section-head p{color:var(--text-secondary);font-size:16px;line-height:1.6;margin:0;}
+.section-alt{background:linear-gradient(180deg,transparent, rgba(255,255,255,0.015) 15%, rgba(255,255,255,0.015) 85%, transparent);}
+
+/* ============================================================
+   FEATURES
+   ============================================================ */
+.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.feature-card{
+  padding:28px 26px;border-radius:var(--radius-lg);
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  backdrop-filter:var(--blur-sm);-webkit-backdrop-filter:var(--blur-sm);
+  transition:transform .25s var(--ease-out), border-color .25s var(--ease-out), background .25s var(--ease-out);
+}
+.feature-card:hover{transform:translateY(-4px);border-color:var(--glass-border-strong);background:var(--glass-bg-elevated);}
+.feature-icon{
+  width:42px;height:42px;border-radius:12px;margin-bottom:18px;
+  background:var(--accent-subtle);border:1px solid var(--accent-border);
+  display:flex;align-items:center;justify-content:center;color:var(--accent);
+}
+.feature-card h3{font-size:16.5px;margin:0 0 9px;letter-spacing:-.005em;}
+.feature-card p{font-size:14px;color:var(--text-secondary);line-height:1.6;margin:0;}
+
+@media (max-width:920px){.feature-grid{grid-template-columns:1fr 1fr;}}
+@media (max-width:620px){.feature-grid{grid-template-columns:1fr;}}
+
+/* ============================================================
+   DOWNLOAD
+   ============================================================ */
+.os-banner{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:16px 22px;border-radius:var(--radius-pill);
+  background:var(--accent-subtle);border:1px solid var(--accent-border);
+  margin-bottom:36px;font-size:13.5px;color:var(--text-secondary);
+}
+.os-banner strong{color:var(--text-primary);}
+.download-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+.download-card{
+  padding:32px;border-radius:var(--radius-xl);
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  box-shadow:var(--glass-specular);
+  position:relative;transition:border-color .2s var(--ease-out);
+}
+.download-card.is-detected{border-color:var(--accent-border);box-shadow:var(--glass-specular), 0 0 0 1px rgba(76,139,245,0.25), 0 20px 50px rgba(76,139,245,0.15);}
+.download-card .badge{
+  position:absolute;top:-11px;right:24px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:5px 12px;border-radius:var(--radius-pill);
+}
+.download-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.os-icon{
+  width:46px;height:46px;border-radius:13px;flex-shrink:0;
+  background:var(--surface-md);border:1px solid var(--glass-border);
+  display:flex;align-items:center;justify-content:center;color:var(--text-primary);
+}
+.download-head h3{margin:0 0 3px;font-size:19px;}
+.download-head .platform-sub{font-size:12.5px;color:var(--text-tertiary);}
+.download-card ul{list-style:none;margin:18px 0 24px;padding:0;display:flex;flex-direction:column;gap:9px;}
+.download-card ul li{
+  display:flex;align-items:flex-start;gap:9px;
+  font-size:13.5px;color:var(--text-secondary);line-height:1.5;
+}
+.download-card ul li svg{flex-shrink:0;margin-top:3px;color:var(--success);}
+.download-note{font-size:12px;color:var(--text-tertiary);margin-top:12px;line-height:1.5;}
+.download-note code{font-family:var(--font-mono);background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:5px;}
+
+@media (max-width:820px){.download-grid{grid-template-columns:1fr;}}
+
+/* ============================================================
+   INSTALL STEPS
+   ============================================================ */
+.steps{counter-reset:step;display:flex;flex-direction:column;gap:0;max-width:680px;}
+.step-item{
+  display:grid;grid-template-columns:44px 1fr;gap:18px;
+  padding:22px 0;position:relative;
+}
+.step-item:not(:last-child){border-bottom:1px solid var(--glass-border);}
+.step-num{
+  counter-increment:step;
+  width:36px;height:36px;border-radius:11px;
+  background:var(--glass-bg-hover);border:1px solid var(--glass-border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:13px;color:var(--accent);font-weight:600;
+}
+.step-num::before{content:counter(step);}
+.step-body h4{margin:4px 0 6px;font-size:15.5px;}
+.step-body p{margin:0;color:var(--text-secondary);font-size:14px;line-height:1.65;}
+.step-body .gatekeeper-note{
+  margin-top:12px;padding:12px 14px;border-radius:10px;
+  background:rgba(229,192,123,0.08);border:1px solid rgba(229,192,123,0.28);
+  font-size:12.5px;color:#dcc596;line-height:1.6;
+}
+
+/* ============================================================
+   DOCS / QUICKSTART
+   ============================================================ */
+.docs-grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:start;}
+.quickstart-list{display:flex;flex-direction:column;gap:16px;}
+.quickstart-item{display:flex;gap:14px;align-items:flex-start;}
+.quickstart-item .qi-icon{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  background:var(--accent-subtle);border:1px solid var(--accent-border);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+}
+.quickstart-item h4{margin:2px 0 4px;font-size:14.5px;}
+.quickstart-item p{margin:0;font-size:13.5px;color:var(--text-secondary);line-height:1.6;}
+
+.shortcut-table{
+  border-radius:var(--radius-lg);overflow:hidden;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+}
+.shortcut-row{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 20px;font-size:13.5px;
+}
+.shortcut-row:not(:last-child){border-bottom:1px solid var(--glass-border);}
+.shortcut-row .action{color:var(--text-secondary);}
+.kbd-group{display:flex;gap:6px;}
+kbd{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--text-primary);
+  background:rgba(255,255,255,0.07);border:1px solid var(--glass-border-strong);
+  border-bottom-width:2px;
+  padding:3px 8px;border-radius:6px;
+}
+.shortcut-foot{padding:14px 20px;font-size:12px;color:var(--text-tertiary);}
+
+@media (max-width:860px){.docs-grid{grid-template-columns:1fr;}}
+
+/* ============================================================
+   FAQ
+   ============================================================ */
+.faq-list{max-width:760px;display:flex;flex-direction:column;gap:12px;}
+.faq-item{
+  border-radius:var(--radius-md);overflow:hidden;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+}
+.faq-item summary{
+  list-style:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:19px 22px;font-size:15px;font-weight:600;
+  transition:background .15s var(--ease-out);
+}
+.faq-item summary::-webkit-details-marker{display:none;}
+.faq-item summary:hover{background:var(--glass-bg-hover);}
+.faq-item summary .chev{
+  flex-shrink:0;color:var(--text-tertiary);
+  transition:transform .25s var(--ease-out);
+}
+.faq-item[open] summary .chev{transform:rotate(45deg);color:var(--accent);}
+.faq-body{padding:0 22px 20px;color:var(--text-secondary);font-size:14px;line-height:1.7;}
+
+/* ============================================================
+   CLOSING CTA
+   ============================================================ */
+.closing{
+  padding:80px 0 100px;
+}
+.closing-panel{
+  padding:64px 48px;border-radius:var(--radius-xl);text-align:center;
+  background:
+    radial-gradient(ellipse 700px 320px at 30% 0%, rgba(76,139,245,0.16), transparent 60%),
+    radial-gradient(ellipse 500px 320px at 100% 100%, rgba(139,124,246,0.14), transparent 60%),
+    var(--glass-bg);
+  border:1px solid var(--glass-border);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+}
+.closing-panel h2{font-size:clamp(26px,3.6vw,36px);margin:14px 0 14px;letter-spacing:-.02em;}
+.closing-panel p{color:var(--text-secondary);max-width:480px;margin:0 auto 28px;font-size:15.5px;}
+.closing-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer{border-top:1px solid var(--glass-border);padding:48px 0 40px;}
+.footer-grid{display:flex;justify-content:space-between;align-items:flex-start;gap:40px;flex-wrap:wrap;}
+.footer-brand p{color:var(--text-tertiary);font-size:13px;max-width:280px;line-height:1.6;margin:12px 0 0;}
+.footer-links{display:flex;gap:56px;flex-wrap:wrap;}
+.footer-col h5{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);margin:0 0 14px;}
+.footer-col a{display:block;font-size:13.5px;color:var(--text-secondary);margin-bottom:10px;}
+.footer-col a:hover{color:var(--text-primary);}
+.footer-bottom{
+  margin-top:44px;padding-top:22px;border-top:1px solid var(--glass-border);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  font-size:12px;color:var(--text-tertiary);
+}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand"><span class="brand-mark"></span>Time Browser</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="#changelog">Changelog</a>
+      <a href="https://github.com/time-browser/time" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <div class="nav-cta">
+      <span class="nav-version">v0.0.7</span>
+      <a href="#download" class="btn btn-glass btn-sm">Docs</a>
+      <a href="#download" class="btn btn-primary btn-sm" id="navDownloadBtn">Download</a>
+    </div>
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+      <svg id="menuIconOpen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="mobile-panel" id="mobilePanel">
+    <a href="#features">Features</a>
+    <a href="#download">Download</a>
+    <a href="docs.html">Docs</a>
+    <a href="#changelog">Changelog</a>
+    <a href="https://github.com/time-browser/time" target="_blank" rel="noopener">GitHub</a>
+    <a href="#download" class="btn btn-primary btn-block">Download for your Mac</a>
+  </div>
+</nav>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow"><span class="dot"></span>Time Browser · v0.0.7 · Early access</span>
+      <h1>A browser<br>built around <span class="grad">your time.</span></h1>
+      <p class="lede">Time is a focused, keyboard-first desktop browser with a liquid glass interface, local-first history and bookmarks, and zero telemetry. No account. No cloud sync you didn't ask for. Just a fast, calm place to browse.</p>
+      <div class="hero-actions">
+        <a href="#download" class="btn btn-primary" id="heroDownloadBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span id="heroDownloadLabel">Download for macOS</span>
+        </a>
+        <a href="docs.html" class="btn btn-glass">Read the docs</a>
+      </div>
+      <div class="hero-meta">
+        <span><span class="pip"></span>Zero telemetry</span>
+        <span>Version 0.0.7</span>
+        <span>macOS · Electron</span>
+      </div>
+    </div>
+
+    <div class="mock-stage reveal">
+      <div class="mock-glow"></div>
+      <div class="mock-window">
+        <div class="mock-chrome">
+          <div class="mock-tabbar">
+            <div class="mock-traffic"><i></i><i></i><i></i></div>
+            <div class="mock-tab active"><span class="fav"></span>New Tab</div>
+            <div class="mock-tab"><span class="fav"></span>Docs</div>
+            <div class="mock-tab-plus">+</div>
+          </div>
+          <div class="mock-navbar">
+            <div class="mock-nav-icons">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="mock-omnibox">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              time://newtab
+            </div>
+          </div>
+        </div>
+        <div class="mock-viewport">
+          <div class="mock-line" style="width:38%"></div>
+          <div class="mock-line" style="width:62%"></div>
+          <div class="mock-line" style="width:48%"></div>
+          <div class="mock-card">
+            <div class="sq"></div>
+            <div style="flex:1">
+              <div class="mock-line" style="width:70%;margin-bottom:6px"></div>
+              <div class="mock-line" style="width:40%;margin-bottom:0"></div>
+            </div>
+          </div>
+        </div>
+        <div class="mock-statusbar">
+          <span>Zero outbound tracking requests</span>
+          <span class="clock" id="mockClock">--:--:--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ FEATURES ============ -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Features</span>
+      <h2>Everything in v0.0.7, nothing you didn't ask for.</h2>
+      <p>Time ships with a focused set of browsing fundamentals, done well, rather than a long list of half-built apps.</p>
+    </div>
+    <div class="feature-grid">
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18" opacity=".5"/><circle cx="7.5" cy="6" r=".8" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <h3>Liquid Glass interface</h3>
+        <p>A translucent, blurred glass UI with adjustable accent color, blur density, and specular highlights — plus Dark Focus, Light Minimalist, OLED Deep Black, and System Sync theme presets.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z" opacity="0"/><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 4v5"/><path d="M12 4v5"/></svg>
+        </div>
+        <h3>Keyboard-first tabs</h3>
+        <p>Open, close, and cycle tabs entirely from the keyboard. Closing the active tab hands focus to the next one over, and every core action has a shortcut.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l3 3-9 9-4 1 1-4z" opacity="0"/><path d="M11 3a8 8 0 1 0 8 8" opacity="0"/><path d="M12 4a1 1 0 0 1 1 1v6l5 3-1 2-6-4V5a1 1 0 0 1 1-1z" opacity="0"/><circle cx="12" cy="12" r="9"/><path d="M12 7l4 4-4 4-4-4z" opacity="0"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3>One-click bookmarks</h3>
+        <p>Toggle a bookmark straight from the omnibox star. Organize into a bookmarks bar, custom folders, and pinned quick-access slots.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3>Built-in downloads manager</h3>
+        <p>Pause, resume, cancel, or reveal a file in Finder. Executable file types get a plain-language warning before they land on disk.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+        </div>
+        <h3>Local-first history</h3>
+        <p>History and bookmarks live in an on-device database, not a cloud account. There's nothing to sign into and nothing syncing behind your back.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <h3>Omnibox &amp; command routing</h3>
+        <p>One bar for URLs and search. Type a web address and Time routes you there; type anything else and it dispatches a search — instantly, with <kbd style="padding:1px 6px;font-size:10.5px;">⌘L</kbd> to jump straight in.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="section section-alt" id="download">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Download</span>
+      <h2>Get Time Browser 0.0.7</h2>
+      <p>Early access build. The macOS release is built and tested; other platforms are on the way.</p>
+    </div>
+
+    <div class="os-banner reveal" id="osBanner">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span id="osBannerText">We detected your operating system — the matching download is highlighted below.</span>
+    </div>
+
+    <div class="download-grid">
+
+      <div class="download-card reveal" id="cardMac">
+        <span class="badge">Recommended</span>
+        <div class="download-head">
+          <div class="os-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.435 2.19-1.32 3.09-.985 1.06-2.045 1.79-3.32 1.68-.06-1.11.435-2.28 1.29-3.16.9-.94 2.42-1.62 3.35-1.61zM20.5 17.2c-.42.98-.62 1.42-1.15 2.29-.75 1.24-1.8 2.79-3.1 2.8-1.16.01-1.46-.75-3.04-.74-1.58.01-1.91.75-3.07.74-1.3-.01-2.29-1.42-3.04-2.65-2.08-3.4-2.3-7.4-.99-9.55.93-1.53 2.4-2.43 3.78-2.43 1.4 0 2.28.77 3.44.77 1.13 0 1.81-.77 3.44-.77 1.24 0 2.55.68 3.49 1.85-3.07 1.68-2.57 6.07.24 7.69z"/></svg>
+          </div>
+          <div>
+            <h3>macOS</h3>
+            <div class="platform-sub">Apple Silicon &amp; Intel · .dmg</div>
+          </div>
+        </div>
+        <ul>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Version 0.0.7, built and tested on macOS</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Requires macOS 12 Monterey or later</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>~102   MB download</li>
+        </ul>
+        <a href="TimeBrowser-0.0.7.dmg" class="btn btn-primary btn-block" id="dmgDownloadBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS (.dmg)
+        </a>
+      </div>
+
+      <div class="download-card reveal" id="cardWin">
+        <div class="download-head">
+          <div class="os-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.5L9.75 2.2v9.3H0zm10.75-1.4L24 0v11.5H10.75zM0 12.5h9.75v9.3L0 20.5zm10.75 0H24V24l-13.25-1.8z"/></svg>
+          </div>
+          <div>
+            <h3>Windows</h3>
+            <div class="platform-sub">Windows 10/11 · .exe</div>
+          </div>
+        </div>
+        <ul>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Version 0.0.7, packaged from the same source</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Requires Windows 10 or later, 64-bit</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>~85   MB download</li>
+        </ul>
+        <a href="TimeBrowser-0.0.7.exe" class="btn btn-glass btn-block" id="exeDownloadBtn">
+          Download for Windows (.exe)
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSTALL ============ -->
+<section class="section" id="install">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Installation</span>
+      <h2>Installing on macOS</h2>
+      <p>Five steps, no account required.</p>
+    </div>
+    <div class="steps reveal">
+      <div class="step-item">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Download the DMG</h4>
+          <p>Grab <code style="font-family:var(--font-mono);font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px;">TimeBrowser-0.0.7.dmg</code> from the download section above.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Open the disk image</h4>
+          <p>Double-click the downloaded file to mount it. A window will appear with the Time Browser app icon.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Drag Time Browser to Applications</h4>
+          <p>Drag the app icon onto the Applications shortcut in the same window, then eject the disk image.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Launch it</h4>
+          <p>Open Time Browser from your Applications folder or Launchpad.</p>
+          <div class="gatekeeper-note">
+            <strong>First launch on an early-access build:</strong> if macOS flags the app as being from an unidentified developer, right-click (or Control-click) the app and choose <strong>Open</strong>, or approve it under <strong>System Settings → Privacy &amp; Security</strong>. This is standard for early builds that aren't notarized yet — you only need to do it once.
+          </div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>You're in</h4>
+          <p>Time Browser opens to <code style="font-family:var(--font-mono);font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px;">time://newtab</code>. Press <kbd>⌘</kbd><kbd>T</kbd> for a new tab or <kbd>⌘</kbd><kbd>L</kbd> to jump into the omnibox.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOCS / QUICKSTART ============ -->
+<section class="section section-alt" id="docs">
+  <div class="container docs-grid">
+    <div class="reveal">
+      <span class="eyebrow"><span class="dot"></span>Documentation</span>
+      <h2 style="font-size:clamp(26px,3.2vw,32px);letter-spacing:-.02em;margin:14px 0 20px;">Quick start</h2>
+      <div class="quickstart-list">
+        <div class="quickstart-item">
+          <div class="qi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+          <div><h4>Navigate from anywhere</h4><p>Press <kbd>⌘</kbd><kbd>L</kbd> to select the omnibox, type a URL or a search, and hit Enter. Time works out which one it is.</p></div>
+        </div>
+        <div class="quickstart-item">
+          <div class="qi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></div>
+          <div><h4>Manage tabs by keyboard</h4><p>New tab with <kbd>⌘</kbd><kbd>T</kbd>, close with <kbd>⌘</kbd><kbd>W</kbd>, and jump to any of the first nine with <kbd>⌘</kbd><kbd>1–9</kbd>.</p></div>
+        </div>
+        <div class="quickstart-item">
+          <div class="qi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-11"/><path d="M12 6V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg></div>
+          <div><h4>Make it yours</h4><p>Open Quick Settings with <kbd>⌘</kbd><kbd>,</kbd> to switch themes, adjust the accent color, and tune the glass blur density.</p></div>
+        </div>
+      </div>
+      <a href="docs.html" class="btn btn-glass" style="margin-top:28px;">
+        Open full documentation
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+
+    <div class="reveal">
+      <div class="shortcut-table">
+        <div class="shortcut-row"><span class="action">New tab</span><div class="kbd-group"><kbd>⌘</kbd><kbd>T</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Close active tab</span><div class="kbd-group"><kbd>⌘</kbd><kbd>W</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Focus omnibox</span><div class="kbd-group"><kbd>⌘</kbd><kbd>L</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Reload page</span><div class="kbd-group"><kbd>⌘</kbd><kbd>R</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Toggle sidebar</span><div class="kbd-group"><kbd>⌘</kbd><kbd>B</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Switch to tab 1–9</span><div class="kbd-group"><kbd>⌘</kbd><kbd>1–9</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Quick settings</span><div class="kbd-group"><kbd>⌘</kbd><kbd>,</kbd></div></div>
+        <div class="shortcut-row"><span class="action">Developer tools</span><div class="kbd-group"><kbd>⌘</kbd><kbd>⌥</kbd><kbd>I</kbd></div></div>
+      </div>
+      <p class="shortcut-foot">The full shortcut matrix, including Windows/Linux equivalents, is in the <a href="docs.html" style="color:var(--accent);">documentation</a>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="faq">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow"><span class="dot"></span>FAQ</span>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq-list reveal">
+      <details class="faq-item">
+        <summary>What is Time Browser?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">A lightweight, keyboard-first desktop browser with a liquid glass interface. It's built on standard web technology (HTML/CSS/JS) and packaged as a native desktop app with Electron.</div>
+      </details>
+      <details class="faq-item">
+        <summary>What platforms are supported?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">The 0.0.7 macOS build is packaged and tested today. A Windows build is planned; check back on this page or the GitHub repo for availability.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Is an account required?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">No. There's no sign-in and no cloud account. History and bookmarks are stored locally on your device.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Does it collect telemetry?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">No. Omnibox searches, history logging, and navigation events produce zero outbound requests to analytics servers — this is a defined acceptance criterion for the release.</div>
+      </details>
+      <details class="faq-item">
+        <summary>How do I install it?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">Download the .dmg, open it, and drag Time Browser into your Applications folder. Full steps are in the <a href="#install" style="color:var(--accent);">installation section</a> above.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Where is the documentation?<span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></summary>
+        <div class="faq-body">The full specification and keyboard shortcut matrix live on the <a href="docs.html" style="color:var(--accent);">documentation page</a>, linked from the navigation bar above.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLOSING CTA ============ -->
+<section class="closing" id="changelog">
+  <div class="container">
+    <div class="closing-panel reveal">
+      <span class="eyebrow"><span class="dot"></span>Version 0.0.7 · Early access</span>
+      <h2>Ready to try Time Browser?</h2>
+      <p>Download the macOS build, or browse the source and changelog on GitHub.</p>
+      <div class="closing-actions">
+        <a href="#download" class="btn btn-primary">Download for macOS</a>
+        <a href="https://github.com/time-browser/time" target="_blank" rel="noopener" class="btn btn-glass">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.06 11.06 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.82 1.19 3.08 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .31.2.66.79.55A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#top" class="brand"><span class="brand-mark"></span>Time Browser</a>
+        <p>A lightweight, keyboard-first desktop browser built for focus, speed, and zero-telemetry privacy.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h5>Product</h5>
+          <a href="#features">Features</a>
+          <a href="#download">Download</a>
+          <a href="#install">Installation</a>
+        </div>
+        <div class="footer-col">
+          <h5>Resources</h5>
+          <a href="docs.html">Documentation</a>
+          <a href="#changelog">Changelog</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div class="footer-col">
+          <h5>Project</h5>
+          <a href="https://github.com/time-browser/time" target="_blank" rel="noopener">GitHub</a>
+          <a href="#download">Version 0.0.7</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Time Browser project. All rights reserved.</span>
+      <span>Version 0.0.7 · Early access build</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ---------- Mobile nav ---------- */
+  var menuToggle = document.getElementById('menuToggle');
+  var mobilePanel = document.getElementById('mobilePanel');
+  menuToggle && menuToggle.addEventListener('click', function(){
+    var open = mobilePanel.classList.toggle('open');
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  mobilePanel && mobilePanel.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){ mobilePanel.classList.remove('open'); menuToggle.setAttribute('aria-expanded','false'); });
+  });
+
+  /* ---------- OS detection ---------- */
+  var ua = navigator.userAgent || '';
+  var platform = navigator.platform || '';
+  var isMac = /Mac/i.test(platform) || /Macintosh/i.test(ua);
+  var isWin = /Win/i.test(platform) || /Windows/i.test(ua);
+
+  var heroLabel = document.getElementById('heroDownloadLabel');
+  var navBtn = document.getElementById('navDownloadBtn');
+  var cardMac = document.getElementById('cardMac');
+  var cardWin = document.getElementById('cardWin');
+  var osBannerText = document.getElementById('osBannerText');
+
+  if(isWin){
+    if(heroLabel) heroLabel.textContent = 'Download for Windows';
+    if(navBtn) navBtn.textContent = 'Download';
+    cardMac && cardMac.classList.remove('is-detected');
+    cardWin && cardWin.classList.add('is-detected');
+    if(osBannerText) osBannerText.innerHTML = 'We detected <strong>Windows</strong> — a tested build isn\'t published yet, but the macOS release is ready today.';
+  } else if(isMac){
+    cardMac && cardMac.classList.add('is-detected');
+    if(osBannerText) osBannerText.innerHTML = 'We detected <strong>macOS</strong> — the download below is built and tested for your system.';
+  } else {
+    if(osBannerText) osBannerText.textContent = 'Time Browser currently ships for macOS, with more platforms on the way.';
+  }
+
+  /* ---------- Smooth anchor scroll (nav-offset aware) ---------- */
+  var navH = document.querySelector('.nav').offsetHeight;
+  document.querySelectorAll('a[href^="#"]').forEach(function(link){
+    link.addEventListener('click', function(e){
+      var id = link.getAttribute('href');
+      if(id.length < 2) return;
+      var target = document.querySelector(id);
+      if(!target) return;
+      e.preventDefault();
+      var y = target.getBoundingClientRect().top + window.pageYOffset - navH + 1;
+      window.scrollTo({top:y, behavior:'smooth'});
+      history.pushState(null, '', id);
+    });
+  });
+
+  /* ---------- Scroll reveal ---------- */
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.12, rootMargin:'0px 0px -60px 0px'});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('is-visible'); });
+  }
+
+  /* ---------- Live clock in the browser mockup ---------- */
+  var clockEl = document.getElementById('mockClock');
+  function tick(){
+    if(!clockEl) return;
+    var d = new Date();
+    var pad = function(n){ return n.toString().padStart(2,'0'); };
+    clockEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
